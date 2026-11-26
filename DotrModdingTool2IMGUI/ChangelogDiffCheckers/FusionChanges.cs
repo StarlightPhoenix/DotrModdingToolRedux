@@ -8,15 +8,15 @@ public class FusionDiffChecker : IDiffChecker<FusionSnapshot>
         //TODO some sort of sorting to comparing to make both new and old ordered the same then compare changes
         foreach (var kvp in oldSnapshot.Fusions)
         {
-            string title = $"Fusion id {kvp.Key}:";
+            string title = $"Fusion ID {kvp.Key}:";
             List<string> diffs = new List<string>();
             FusionData oldFusion = kvp.Value;
             FusionData newFusion = currentSnapshot.Fusions[kvp.Key];
             if (!oldFusion.Bytes.SequenceEqual(newFusion.Bytes))
             {
                 ChangelogManager.Check("Lower Id:", oldFusion.lowerCardName.Edited, newFusion.lowerCardName.Edited, diffs);
-                ChangelogManager.Check("High Id:", oldFusion.higherCardName.Edited, newFusion.higherCardName.Edited, diffs);
-                ChangelogManager.Check("result Id:", oldFusion.cardResultName.Edited, newFusion.cardResultName.Edited, diffs);
+                ChangelogManager.Check("Higher Id:", oldFusion.higherCardName.Edited, newFusion.higherCardName.Edited, diffs);
+                ChangelogManager.Check("Result Id:", oldFusion.cardResultName.Edited, newFusion.cardResultName.Edited, diffs);
                 diffs.Add($"Fusion: {newFusion.cardResultName} = {newFusion.lowerCardName.Edited} + {newFusion.higherCardName.Edited}");
             }
             if (diffs.Count > 0)

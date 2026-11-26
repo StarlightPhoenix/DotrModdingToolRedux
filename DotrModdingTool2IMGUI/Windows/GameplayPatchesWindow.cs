@@ -962,11 +962,11 @@ public class GameplayPatchesWindow : IImGuiWindow
             ImGui.InputInt("##leaderRecovery", ref leaderRecovery, 50);
         }
         
-        ImGui.Checkbox("[Leader / Fast] TOON Leaders change Terrain to TOON", ref bToonLeaderLandChange);
+        ImGui.Checkbox("[Leader / Fast] Toon Leaders change Terrain to TOON", ref bToonLeaderLandChange);
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip("If a Deck Leader with the Terrain Change Leader Ability is \n" +
-                             "strong on TOON, its Ability will create TOON Terrain instead");
+                             "Strong on TOON, its Ability will create TOON Terrain instead");
         }
         
         // Insert any other Leader Skill patch

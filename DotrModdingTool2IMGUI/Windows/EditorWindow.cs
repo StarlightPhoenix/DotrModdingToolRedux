@@ -48,8 +48,8 @@ public class EditorWindow
     TextEffectDemoWindow _textEffectDemoWindow;
 #endif
 
-    bool isCreditsOpen = false;
-
+    // Allows editors, like Map Editor, to get Credits status
+    public static bool isCreditsOpen = false;
 
     //Data Access
     DataAccess dataAccess = DataAccess.Instance;
@@ -100,8 +100,8 @@ public class EditorWindow
     public EditorWindow()
     {
         //  PrintEmbeddedResources();
-        io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard | ImGuiConfigFlags.DpiEnableScaleFonts | ImGuiConfigFlags.DpiEnableScaleViewports;
 
+        io.ConfigFlags |= ImGuiConfigFlags.DpiEnableScaleFonts | ImGuiConfigFlags.DpiEnableScaleViewports;
 
         _generalEditorWindow = new GeneralEditorWindow(FontManager.GetFont(FontManager.FontFamily.NotoSansJP, 26));
         _cardEditorWindow = new CardEditorWindow();
@@ -227,18 +227,22 @@ public class EditorWindow
             disabledTimer += ImGui.GetIO().DeltaTime;
         }
         // Locale Management : Force '.', also get rid of float-irrelevant digits
-        ImGui.Text($"FPS: {Math.Round(ImGui.GetIO().Framerate, 3).ToString().Replace(',','.')}");
+        ImGui.Text($"FPS: {(ImGui.GetIO().Framerate).ToString("0.000").Replace(',','.')}");
         if (DataAccess.Instance.IsIsoLoaded)
         {
             ImGui.PushFont(FontManager.GetBestFitFont("Vanilla Iso"));
             string hash = DataAccess.Instance.CurrentHash;
-            if (!DataAccess.Instance.IsVanillaSize || (hash != String.Empty && hash != DataAccess.VanillaHash))
-            {
-                ImGui.TextColored(new GuiColour(Color.Crimson).value, "Modded ISO");
-            }
-            else if (hash == String.Empty)
+            
+            /* See "Reverting fix for Vanilla Size check, as MD5 is now used in Snapshots."
+             * We basically want top priority on "Calculating Hash" now, so we know when to Snapshot.
+             * IsVanillaSize remains a legit check. */
+            if (hash == String.Empty)
             {
                 ImGui.Text("Calculating Hash");
+            }
+            else if (!DataAccess.Instance.IsVanillaSize || (hash != String.Empty && hash != DataAccess.VanillaHash))
+            {
+                ImGui.TextColored(new GuiColour(Color.Crimson).value, "Modded ISO");
             }
             else
             {
@@ -257,7 +261,6 @@ public class EditorWindow
                 {
                     OpenIso();
                 }
-
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
@@ -267,10 +270,7 @@ public class EditorWindow
 
                 ImGui.Spacing();
 
-                if (!dataAccess.IsIsoLoaded)
-                {
-                    ImGui.BeginDisabled();
-                }
+                ImGui.BeginDisabled(!dataAccess.IsIsoLoaded);
 
                 if (ImGui.BeginMenu("Save"))
                 {
@@ -285,9 +285,6 @@ public class EditorWindow
                             _modalPopup.Show("No ISO open to save to");
                         }
                     }
-
-                    ImGui.Spacing();
-
                     if (ImGui.IsItemHovered())
                     {
                         ImGui.BeginTooltip();
@@ -295,6 +292,8 @@ public class EditorWindow
                         ImGui.Text("Ctrl + S");
                         ImGui.EndTooltip();
                     }
+
+                    ImGui.Spacing();
 
                     if (ImGui.MenuItem("Save Strings"))
                     {
@@ -307,14 +306,14 @@ public class EditorWindow
                             _modalPopup.Show("No ISO open to save to");
                         }
                     }
-
-                    ImGui.Spacing();
                     if (ImGui.IsItemHovered())
                     {
                         ImGui.BeginTooltip();
                         ImGui.Text("Saves String changes");
                         ImGui.EndTooltip();
                     }
+                    
+                    ImGui.Spacing();
 
                     if (ImGui.MenuItem("Save ALL"))
                     {
@@ -327,9 +326,6 @@ public class EditorWindow
                             _modalPopup.Show("No ISO open to save to");
                         }
                     }
-
-                    ImGui.Spacing();
-
                     if (ImGui.IsItemHovered())
                     {
                         ImGui.BeginTooltip();
@@ -341,7 +337,6 @@ public class EditorWindow
                     ImGui.EndMenu();
                 }
 
-
                 if (ImGui.MenuItem("Print Passwords"))
                 {
                     if (dataAccess.IsIsoLoaded)
@@ -350,80 +345,93 @@ public class EditorWindow
                     }
                     else
                     {
-                        _modalPopup.Show("No ISO open to save to");
+                        _modalPopup.Show("No ISO open to print Passwords from");
                     }
                 }
 
                 ImGui.Spacing();
-                if (dataAccess.IsIsoLoaded)
-                {
-                    if (ImGui.BeginMenu("Changelog"))
-                    {
-                        if (ImGui.MenuItem("Auto Changelog", null, ref UserSettings.AutoChangelog))
-                        {
-                        }
 
-                        if (ImGui.MenuItem("Take old snapshot"))
+                if (ImGui.BeginMenu("Changelog"))
+                {
+                    /* Moving Auto Changelog to Options.
+                     * It turns out it does have an effect when Loading an ISO,
+                     * but it cannot toggle on/off before actually Loading an ISO.
+                     * (It was totally invisible before ; it remains disabled here, including Tooltip.) */
+
+                    if (ImGui.MenuItem("Take Old Snapshot"))
+                    {
+                        // Now required. May happen if rushing Open ISO into Take Snapshot within seconds.
+                        // Pretty rare outside of Vanilla though, and cashed back later on anyway. See "Generate Changelog".
+                        if (DataAccess.Instance.CurrentHash == String.Empty)
+                        {
+                            _modalPopup.Show("Calculating MD5 hash data.\nPlease wait for calculation to finish, then try again.");
+                        }
+                        else
                         {
                             ChangelogManager.OldSnapshot = new ModSnapshot();
                         }
-
-                        if (ImGui.MenuItem("Take new snapshot"))
-                        {
-
-                            ChangelogManager.NewSnapshot = new ModSnapshot();
-                        }
-
-                        if (ImGui.MenuItem("Generate Changelog"))
-                        {
-                            if (ChangelogManager.OldSnapshot is null)
-                            {
-                                _modalPopup.Show("No old snapshot");
-
-                            }
-                            else
-                            {
-                                if (ChangelogManager.NewSnapshot is null)
-                                {
-                                    ChangelogManager.NewSnapshot = new ModSnapshot();
-                                }
-
-                                DataAccess.Instance.GetMd5Hash();
-                                string changelogText =
-                                    ChangelogManager.FormatResultsAsString(ChangelogManager.CompareAll());
-                                Console.WriteLine("Passed Comparison");
-                                File.WriteAllText($"Logs/Changelog_{DataAccess.Instance.CurrentHash}.txt",
-                                    changelogText);
-                                _ = Task.Run(async () =>
-                                {
-                                    try
-                                    {
-                                        Disabled = true;
-                                        _modalPopup.Show("Generating MD5 hash and logs", "Saving");
-
-
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"MD5 hash failed (also written to log): {ex}");
-                                    }
-                                    finally
-                                    {
-                                        Disabled = false;
-                                    }
-                                });
-
-                            }
-
-
-                        }
-
-                        ImGui.EndMenu();
                     }
 
-                    ImGui.Spacing();
+                    if (ImGui.MenuItem("Take New Snapshot"))
+                    {
+                        // Rare, but required. See "Old Snapshot".
+                        if (DataAccess.Instance.CurrentHash == String.Empty)
+                        {
+                            _modalPopup.Show("Calculating MD5 hash data.\nPlease wait for calculation to finish, then try again.");
+                        }
+                        else
+                        {
+                            ChangelogManager.NewSnapshot = new ModSnapshot();
+                        }
+                    }
+
+                    if (ImGui.MenuItem("Generate Changelog"))
+                    {
+                        if (ChangelogManager.OldSnapshot is null)
+                        {
+                            _modalPopup.Show("Old Snapshot is missing");
+                        }
+                        /* There is a flaw in that Snapshots are persistent during a session ;
+                         * asking for a Changelog with a null NewSnapshot is a bad pattern,
+                         * and it will give unexpected results when opening multiple ISOs.
+                         * That said, if you really know what you're doing, it's a non-issue,
+                         * as actual file name bugs are now fixed, so it can't overwrite another ISO's log.
+                         * Leaving the check below like this so it's easy to comment out - at your own risk. */
+                        else if (ChangelogManager.NewSnapshot is null)
+                        {
+                            _modalPopup.Show("New Snapshot is missing");
+                        }
+                        else
+                        {
+                            // Fallback behavior ; check warning above
+                            if (ChangelogManager.NewSnapshot is null)
+                            {
+                                ChangelogManager.NewSnapshot = new ModSnapshot();
+                            }
+                            
+                            // Superfast Changelog time, shrunk beyond 90%.
+                            // The older code wasn't truly async - but we honestly no longer even need going async
+                            string changelogText =
+                                ChangelogManager.FormatResultsAsString(ChangelogManager.CompareAll());
+                            Console.WriteLine("Passed Comparison");
+                            File.WriteAllText($"Logs/Changelog_{ChangelogManager.NewSnapshot.SnapshotHash}-{ChangelogManager.OldSnapshot.SnapshotHash}.txt",
+                                changelogText);
+                            _modalPopup.Show("Changelog saved in Logs :\n" +
+                                             ChangelogManager.NewSnapshot.SnapshotHash + "\nfrom " +
+                                             ChangelogManager.OldSnapshot.SnapshotHash, "Changelog");
+                        }
+                    }
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.Text("Compare Old and New Snapshots");
+                        ImGui.EndTooltip();
+                    }
+
+                    ImGui.EndMenu();
                 }
 
+                ImGui.Spacing();
 
                 if (ImGui.BeginMenu("Import"))
                 {
@@ -515,7 +523,6 @@ public class EditorWindow
                     }
 
                     ImGui.EndMenu();
-
                 }
 
                 if (ImGui.BeginMenu("Export"))
@@ -603,10 +610,7 @@ public class EditorWindow
                     ImGui.EndMenu();
                 }
 
-                if (!dataAccess.IsIsoLoaded)
-                {
-                    ImGui.EndDisabled();
-                }
+                ImGui.EndDisabled();
 
                 ImGui.EndMenu();
             }
@@ -617,9 +621,7 @@ public class EditorWindow
             {
                 if (ImGui.MenuItem("Toggle Image tooltips", null, ref UserSettings.ToggleImageTooltips))
                 {
-                    
                 }
-
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
@@ -632,13 +634,11 @@ public class EditorWindow
 
                 if (ImGui.MenuItem("Performance Mode", null, ref UserSettings.performanceMode)) 
                 {
-                    
                 }
-                
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
-                    ImGui.Text("Caps the framerate to 30fps when the window is not focused\nor an item is not hovered");
+                    ImGui.Text("Caps the framerate to 30fps when the window is not focused\nand no item is hovered");
                     ImGui.Text("Ctrl + P");
                     ImGui.EndTooltip();
                 }
@@ -647,9 +647,7 @@ public class EditorWindow
                 
                 if (ImGui.MenuItem("Use original Strings", null, ref UserSettings.UseDefaultNames))
                 {
-                    
                 }
-                
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
@@ -663,16 +661,27 @@ public class EditorWindow
                 
                 if (ImGui.MenuItem("Use original Images", null, ref UserSettings.UseOriginalImages))
                 {
-                    
                 }
-                
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
                     ImGui.Text("Shows Vanilla images in editors rather than current ones");
                     ImGui.Text("Ctrl + I");
                     ImGui.EndTooltip();
+                }
 
+                ImGui.Spacing();
+                
+                if (ImGui.MenuItem("Auto Changelog", null, ref UserSettings.AutoChangelog))
+                {
+                }
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.Text("Create Changelog files when Saving modifications");
+                    ImGui.Text("Automatically assigns Old Snapshots when Loading ISOs");
+                    ImGui.Text("Automatically assigns New Snapshots when Saving ISOs");
+                    ImGui.EndTooltip();
                 }
                 
                 ImGui.EndMenu();
@@ -1033,7 +1042,13 @@ public class EditorWindow
                 DataAccess.Instance.CurrentHash = String.Empty;
                 LoadDataFromIso();
                 UserSettings.LastIsoPath = Path.GetDirectoryName(isoPath);
-                if (DataAccess.Instance.IsVanillaSize)
+                
+                /* Reverting fix for Vanilla Size check, as MD5 is now used in Snapshots,
+                 * and Superfast Changelog otherwise would break on custom-sized mods.
+                 * Since the latter actually already exist, they are trivially more likely
+                 * than a potential illegitimate MD5 collision resulting from that. */
+                //if (DataAccess.Instance.IsVanillaSize)
+                if (true)
                 {
                     _ = Task.Run(async () =>
                     {
@@ -1096,10 +1111,16 @@ public class EditorWindow
 
         if (UserSettings.AutoChangelog)
         {
+            // TODO : Auto Changelog can't catch String changes, since they're saved async.
             DataAccess.Instance.GetMd5Hash();
             ChangelogManager.NewSnapshot = new ModSnapshot();
             string changelogText = ChangelogManager.FormatResultsAsString(ChangelogManager.CompareAll());
             File.WriteAllText($"Logs/Changelog_{DataAccess.Instance.CurrentHash}.txt", changelogText);
+        }
+        else
+        {
+            // Fix MD5 calculation not updating when Saving
+            Task.Run(async () => { await DataAccess.Instance.GetMd5HashAsync(); });
         }
 
         if (saveStrings)
@@ -1110,8 +1131,6 @@ public class EditorWindow
         {
             printComplete();
         }
-
-
 
     }
 

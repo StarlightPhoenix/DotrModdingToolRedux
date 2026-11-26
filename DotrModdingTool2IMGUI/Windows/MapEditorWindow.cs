@@ -52,16 +52,41 @@ public class MapEditorWindow : IImGuiWindow
             return;
         }
         
-        ImGui.BeginChild("leftPanel", new Vector2(ImGui.GetContentRegionAvail().X * 0.33f, ImGui.GetContentRegionAvail().Y), ImGuiChildFlags.None, ImGuiWindowFlags.AlwaysVerticalScrollbar);
-        float indent = ImGui.GetContentRegionAvail().X / 32;
-        ImGui.Indent(indent);
-        DrawMapExtras();
-        DrawTreasureDetails();
-        DrawMapPalette();
-        ImGui.Unindent(indent);
-        ImGui.EndChild();
+        float indent = ImGui.GetContentRegionAvail().X / 96;
+
+        if (ImGui.BeginChild("leftPanel",
+                new Vector2(ImGui.GetContentRegionAvail().X / 3, ImGui.GetContentRegionAvail().Y),
+                ImGuiChildFlags.None, ImGuiWindowFlags.AlwaysVerticalScrollbar))
+        {
+            ImGui.Indent(indent);
+            DrawMapExtras();
+            ImGui.NewLine();
+            if (DrawTreasureDetails())
+            {
+                ImGui.NewLine();
+            }
+            DrawMapPalette();
+            ImGui.Unindent(indent);
+            ImGui.EndChild();
+        }
+
         ImGui.SameLine();
-        DrawMap();
+        
+        // Securing Child call here, so we can text, then check for isCreditsOpen and return safely
+        if (ImGui.BeginChild("MapDisplay"))
+        {
+            ImGui.Text("Left click and/or drag to paint with the current tile.");
+            ImGui.Text("Right click to move the hidden card.");
+            
+            // Fixing a glitch where Map Layout overrides Credits display
+            if (!EditorWindow.isCreditsOpen)
+            {
+                DrawMapLayout();
+            }
+
+            ImGui.EndChild();
+        }
+        
     }
 
     public void LoadTreasureCardData()
@@ -70,28 +95,35 @@ public class MapEditorWindow : IImGuiWindow
         TreasureCards.Instance.InitTreasureData(treasureCardBytes);
     }
 
-    void DrawTreasureDetails()
+    bool DrawTreasureDetails()
     {
+        // Returns whether ImGui should Newline, in other words, whether it has printed something at all,
+        // so Render() avoids double Newline.
+        // Therefore, the ISO early return should return True ; only Custom Duel Maps should return False.
+        
         if (!DataAccess.Instance.IsIsoLoaded)
         {
+            // No ISO loaded - Debug, since Render() catches it, but probably still worth the warning
             ImGui.Text($" Please load an ISO to see treasures");
-            return;
+            return true;
         }
-
-        ImGui.NewLine();
+        
         float availableWidth = ImGui.GetContentRegionAvail().X;
-        if (currentMapIndex < DataAccess.TreasureCardCount)
+        
+        // Merging condition checks
+        if (currentMapIndex >= DataAccess.TreasureCardCount)
+        {
+            // No Treasure Data - not wasting room printing stuff
+            return false;
+        }
+        else //if (currentMapIndex < DataAccess.TreasureCardCount)
         {
             if (Enum.IsDefined(typeof(EEnemyImages), currentMapIndex))
             {
                 ImGui.Image(GlobalImages.Instance.Enemies[(EEnemyImages)currentMapIndex], ImageHelper.DefaultImageSize);
                 ImGui.SameLine();
             }
-
-        }
-
-        if (currentMapIndex < DataAccess.TreasureCardCount)
-        {
+            
             currentTreasureCard = TreasureCards.Instance.Treasures.First(i => i.EnemyIndex == currentMapIndex);
             if (currentTreasureCard.CardIndex != 999)
             {
@@ -123,6 +155,8 @@ public class MapEditorWindow : IImGuiWindow
                 }
                 ImGui.EndCombo();
             }
+
+            return true;
         }
     }
 
@@ -138,8 +172,7 @@ public class MapEditorWindow : IImGuiWindow
 
         float availableWidth = ImGui.GetContentRegionAvail().X;
         float mapXPad = ImGui.GetStyle().CellPadding.X;
-
-        ImGui.NewLine();
+        
         ImGui.Text("Map Editor Palette");
         
         // Dynamic Icon and Font Size Support
@@ -159,7 +192,7 @@ public class MapEditorWindow : IImGuiWindow
 
         /* Fixing layout for Current Tile into a Table similar to the Palette below. See below.
          * (Ignore) Alignment padding on Column 0 ; Tile Icon on Column 1, Tile Text on Columns 2+. */
-        if (ImGui.BeginTable("MapCurrentTile", 3, ImGuiTableFlags.None, ImGui.GetContentRegionAvail()))
+        if (ImGui.BeginTable("MapCurrentTile", 3, ImGuiTableFlags.None))
         {
             ImGui.TableSetupColumn("##CurrentTilePadding", 0, mapXPad * 2);
             ImGui.TableSetupColumn("##CurrentTileIcon", 0, availableWidth * 0.26f);
@@ -389,14 +422,11 @@ public class MapEditorWindow : IImGuiWindow
     
 
   
-    void DrawMap()
+    void DrawMapLayout()
     {
+        // Securing ImGui Child calls in Render() instead
+        
         currentMap = dataAccess.maps[currentMapIndex];
-
-        ImGui.BeginChild("MapDisplay");
-
-        ImGui.Text("Left click and/or drag to paint with the current tile.");
-        ImGui.Text("Right click to move the hidden card.");
 
         // Align map away from text
         ImGui.NewLine();
@@ -554,8 +584,7 @@ public class MapEditorWindow : IImGuiWindow
             bottomImagePos + spacing * 0.5f,
             bottomImagePos + tileSize + spacing * 0.5f
         );
-
-        ImGui.EndChild();
+        
     }
 
 

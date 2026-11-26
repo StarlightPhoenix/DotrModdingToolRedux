@@ -220,6 +220,12 @@ public class MusicEditorWindow : IImGuiWindow
         float remainingHeight = ImGui.GetContentRegionAvail().Y;
         ImGui.PushFont(font);
         
+        // Rescale Box Counts on Window Size
+        // Base remainingHeight at 720p : 504 ; one unit is 36. Master Clamp below 22 units to avoid UI desyncs.
+        //Console.WriteLine(remainingHeight);
+        SmallBoxCount =  6 + Math.Clamp((int)(remainingHeight - 504) / 36,  0,  6); // Music Player : 6-12
+        LargeBoxCount = 12 + Math.Clamp((int)(remainingHeight - 504) / 36,  0,  8); // Duelist and Music Select : 12-20
+        
         if (ImGui.BeginChild("LeftThirdPanel", new Vector2(windowSize.X / 3f, remainingHeight),
                 ImGuiChildFlags.Border))
         {

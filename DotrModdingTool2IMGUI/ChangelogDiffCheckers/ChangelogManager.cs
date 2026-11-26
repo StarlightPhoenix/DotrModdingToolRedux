@@ -4,8 +4,6 @@ namespace DotrModdingTool2IMGUI.ChangelogDiffCheckers;
 
 public static class ChangelogManager
 {
-   
-    
     public static ModSnapshot OldSnapshot;
     public static ModSnapshot NewSnapshot;
 
@@ -98,18 +96,24 @@ public static class ChangelogManager
 
 public class ModSnapshot
 {
+    // Avoids CPU-intensive hash recomputing, as well as file name bugs.
+    public string SnapshotHash;
+
+    // Actual Snapshot data
     public DeckSnapshot DeckSnapshot;
     public CardConstSnapshot CardConstantSnapshot;
     public MapSnapshot MapSnapshot;
     public FusionSnapshot FusionSnapshot;
     public AiSnapshot AiSnapshot;
     public CustomPatchSnapshot CustomPatchSnapshot;
-
     public StringSnapshot StringSnapshot;
     public MusicSnapshot MusicSnapshot;
 
     public ModSnapshot()
     {
+        // File > Changelog > Take Snapshot : only the currently open ISO can assign itself a Snapshot slot
+        SnapshotHash = DataAccess.Instance.CurrentHash;
+        
         DeckSnapshot = new DeckSnapshot(Deck.DeckList);
         CardConstantSnapshot = new(
             CardConstant.List, CardDeckLeaderAbilities.MonsterAbilities, MonsterEnchantData.MonsterEnchantDataList,

@@ -64,7 +64,9 @@ class Program
         {
             if (UserSettings.performanceMode)
             {
-                int targetFps = Raylib.IsWindowFocused() || ImGui.IsAnyItemHovered() ? Raylib.GetMonitorRefreshRate(Raylib.GetCurrentMonitor()) : 30;
+                // Support for like, PAL CRT stuff, in case
+                int monitorFps = Raylib.GetMonitorRefreshRate(Raylib.GetCurrentMonitor());
+                int targetFps = Raylib.IsWindowFocused() || ImGui.IsAnyItemHovered() ? monitorFps : Math.Min(monitorFps/2, 30);
 
                 if (targetFps != lastFps)
                 {
@@ -78,22 +80,49 @@ class Program
                 screenHeight = Raylib.GetScreenHeight();
                 Raylib.SetWindowSize(screenWidth, screenHeight);
             }
-            if (Raylib.IsKeyPressed(KeyboardKey.Enter) && (Raylib.IsKeyDown(KeyboardKey.LeftAlt) || Raylib.IsKeyDown(KeyboardKey.RightAlt)))
+
+            if (Raylib.IsKeyPressed(KeyboardKey.Enter) &&
+                (Raylib.IsKeyDown(KeyboardKey.LeftAlt) || Raylib.IsKeyDown(KeyboardKey.RightAlt)))
             {
-                if (Raylib.IsWindowFullscreen())
+                if (Raylib.IsKeyDown(KeyboardKey.LeftControl) || Raylib.IsKeyDown(KeyboardKey.RightControl))
                 {
-                    //Undo Full Screen mode, THEN Restore Size
-                    Raylib.ToggleFullscreen();
-                    Raylib.SetWindowSize(screenWidth, screenHeight);
+                    // Ctrl+Alt+Enter : Maximize AND Full Screen
+                    
+                    // Avoid stacking glitches with Maximize alone below
+                    if (Raylib.IsWindowMaximized())
+                    {
+                        Raylib.RestoreWindow();
+                    }
+                    
+                    // Process Full Screen into Maximize together, separately from Window Size
+                    if (Raylib.IsWindowFullscreen())
+                    {
+                        //Undo Full Screen mode, THEN Restore Size
+                        Raylib.ToggleFullscreen();
+                        Raylib.RestoreWindow();
+                        Raylib.SetWindowSize(screenWidth, screenHeight);
+                    }
+                    else
+                    {
+                        //Max Screen Size, then go Full Screen mode
+                        Raylib.SetWindowSize(monitorWidth, monitorHeight);
+                        Raylib.ToggleFullscreen();
+                        Raylib.MaximizeWindow();
+                    }
                 }
                 else
                 {
-                    //Max Screen Size, then go Full Screen mode
-                    Raylib.SetWindowSize(monitorWidth, monitorHeight);
-                    Raylib.ToggleFullscreen();
+                    // Alt+Enter : Maximize only
+                    if (Raylib.IsWindowMaximized())
+                    {
+                        Raylib.RestoreWindow();
+                    }
+                    else
+                    {
+                        Raylib.MaximizeWindow();
+                    }
                 }
             }
-
 
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.DarkGray);
